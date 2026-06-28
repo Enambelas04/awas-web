@@ -19,7 +19,7 @@ const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD || undefined;
 // Daftar device ESP32 yang ingin ditampilkan
 const DEVICES = [
   { id: "bin-01", label: "Tempat Sampah 1" },
-  { id: "bin-02", label: "Tempat Sampah 2" },
+
 ];
 
 const MAX_HISTORY_POINTS = 30;
