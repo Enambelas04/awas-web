@@ -1,0 +1,39 @@
+services:
+  # Web interface (production build, served via Nginx)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_MQTT_BROKER_URL=ws://localhost:9001
+    depends_on:
+      - mosquitto
+
+  # Versi development (hot reload) — jalankan dengan:
+  # docker compose --profile dev up web-dev
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - VITE_MQTT_BROKER_URL=ws://localhost:9001
+    profiles:
+      - dev
+    depends_on:
+      - mosquitto
+
+  # MQTT broker lokal untuk testing (Mosquitto dengan WebSocket aktif)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"   # MQTT biasa (untuk ESP32 / tools seperti MQTT Explorer)
+      - "9001:9001"   # WebSocket (untuk browser/React)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
