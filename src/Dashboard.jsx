@@ -13,7 +13,7 @@ import {
   Trash2,
   ChevronDown,
 } from "lucide-react";
-
+const { mqttClient, connected } = useMqtt(brokerUrl, options)
 const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL || "https://awas-716bb-default-rtdb.asia-southeast1.firebasedatabase.app";
 const MQTT_USERNAME = import.meta.env.VITE_MQTT_USERNAME || "awas-device";
 const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD || "Testing123";
