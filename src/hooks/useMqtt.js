@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import mqtt from "mqtt";
 
 /**
@@ -19,6 +19,18 @@ import mqtt from "mqtt";
  * Kalau web di-hosting di HTTPS (GitHub Pages, Vercel, dll), browser akan
  * MEMBLOKIR koneksi ws:// (tidak aman/mixed content). Wajib pakai wss://
  * dengan broker yang sudah punya TLS aktif (HiveMQ Cloud sudah otomatis).
+ *
+ * PERBAIKAN (penting):
+ * Sebelumnya objek `mqttClient` yang dikembalikan hook ini dibuat ULANG
+ * setiap kali komponen re-render. Karena objeknya beda referensi tiap
+ * render, komponen yang memakai `mqttClient` di dependency array useEffect
+ * (misal BinCapacityCard) akan terus menjalankan cleanup (unsubscribe) lalu
+ * subscribe ulang berkali-kali — inilah sebabnya subscription di HiveMQ
+ * terlihat "muncul-hilang" terus.
+ *
+ * Solusinya: bungkus objek `mqttClient` dengan useMemo(() => ({...}), [])
+ * supaya referensinya STABIL selama lifetime komponen, tidak dibuat ulang
+ * tiap render.
  */
 export function useMqtt(brokerUrl, options = {}) {
   const [connected, setConnected] = useState(false);
@@ -59,7 +71,6 @@ export function useMqtt(brokerUrl, options = {}) {
       // resolve sendiri lewat reconnect — tetap dibiarkan retry, tapi
       // pesan error ditampilkan supaya kelihatan di UI.
     });
-
     client.on("message", (topic, payload) => {
       const callbacks = subscribersRef.current[topic];
       if (callbacks) {
@@ -75,26 +86,34 @@ export function useMqtt(brokerUrl, options = {}) {
 
   // Adapter dengan bentuk { subscribe, publish, unsubscribe }
   // sesuai yang dibutuhkan WiFiConfigCard / BinCapacityCard
-  const mqttClient = {
-    subscribe(topic, cb) {
-      if (!subscribersRef.current[topic]) {
-        subscribersRef.current[topic] = new Set();
-      }
-      subscribersRef.current[topic].add(cb);
-      clientRef.current?.subscribe(topic);
-    },
-    unsubscribe(topic, cb) {
-      subscribersRef.current[topic]?.delete(cb);
-      if (!subscribersRef.current[topic]?.size) {
-        clientRef.current?.unsubscribe(topic);
-        delete subscribersRef.current[topic];
-      }
-    },
-    publish(topic, payload) {
-      clientRef.current?.publish(topic, payload);
-    },
-  };
+  //
+  // PERBAIKAN: dibungkus useMemo dengan dependency array kosong [],
+  // sehingga objek ini hanya dibuat SEKALI dan referensinya stabil
+  // selama lifetime komponen. Method di dalamnya tetap mengakses
+  // clientRef.current & subscribersRef.current secara live lewat closure
+  // (ref selalu menunjuk ke objek terbaru, jadi aman dipakai di useMemo).
+  const mqttClient = useMemo(
+    () => ({
+      subscribe(topic, cb) {
+        if (!subscribersRef.current[topic]) {
+          subscribersRef.current[topic] = new Set();
+        }
+        subscribersRef.current[topic].add(cb);
+        clientRef.current?.subscribe(topic);
+      },
+      unsubscribe(topic, cb) {
+        subscribersRef.current[topic]?.delete(cb);
+        if (!subscribersRef.current[topic]?.size) {
+          clientRef.current?.unsubscribe(topic);
+          delete subscribersRef.current[topic];
+        }
+      },
+      publish(topic, payload) {
+        clientRef.current?.publish(topic, payload);
+      },
+    }),
+    [] // <- dibuat sekali saja, referensi stabil sepanjang lifetime komponen
+  );
 
   return { mqttClient, connected, error };
 }
-
