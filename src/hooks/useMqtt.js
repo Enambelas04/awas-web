@@ -39,9 +39,11 @@ export function useMqtt(brokerUrl, options = {}) {
   const subscribersRef = useRef({}); // { topic: Set<callback> }
 
   useEffect(() => {
-    if (!brokerUrl) return;
-
-    const client = mqtt.connect(brokerUrl, {
+  if (!brokerUrl) return;
+  const client = mqtt.connect(brokerUrl, { ...options });
+  // ...
+  return () => { client.end(true); };
+}, [brokerUrl, options.username, options.password]);
       reconnectPeriod: 3000,
       connectTimeout: 8000,
       // clientId unik supaya tidak bentrok kalau ada beberapa tab/device
